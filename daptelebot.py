@@ -1,5 +1,5 @@
 from api_football import TELEBOT_TOKEN, FOOTBALL_TOKEN
-import telebot, requests
+import telebot, requests,time
 
 base_url = 'http://api.football-data.org/v4/'
 
@@ -51,7 +51,7 @@ def imprimirNomes(time):
     for letra in nome:
         nome_time += letra
     
-    espaco = 15 - len(nome_time) if time['position'] < 10 else 14 - len(nome_time)
+    espaco = 17 - len(nome_time) if time['position'] < 10 else 16 - len(nome_time)
     nome_time += " " * espaco
     
     return nome_time
@@ -65,7 +65,7 @@ def enviarTabela(mensagem):
 
     try:
         tabela_brasileirao += (f"Tabela do {tabela['competition']['name']}\n")
-        tabela_brasileirao += (f"Pos     Time{21 * " "}Pnts   V   E   D   SG\n")
+        tabela_brasileirao += (f"Pos     Time{25 * " "}Pnts   V   E   D   SG\n")
         for time in tabela['standings'][0]['table']:
             sigla_time = imprimir_siglas(time)
             nome_time = imprimirNomes(time)
@@ -75,6 +75,90 @@ def enviarTabela(mensagem):
     except Exception as e:
         print("Não foi possível obter a tabela.")
         print(e)
-  
+
+
+
+def obter_partidas(campeonato_id):
+    endpoint = f'competitions/{campeonato_id}/matches'
+    url = base_url + endpoint
+
+    response = requests.get(url, headers=headers)
+       
+    dados = response.json()
+    return dados
+
+
+time_casa = []
+time_fora = []
+resultado = []
+vencedor = []
+macth_day = []
+dados = obter_partidas(2013)
+partidas = dados['matches']
+rodadas_geral = []
+rodada_atual = [] 
+def partidas_finalizadas():
+    status = []
+    status_atual = "FINISHED"
+    i = 0
+
+    while status_atual == "FINISHED":
+        status_atual = partidas[i]['status']
+        time_casa.append(partidas[i]['homeTeam']['shortName'])
+        time_fora.append(partidas[i]['awayTeam']['shortName'])
+        resultado.append(f"{partidas[i]['score']['fullTime']['home']} x {partidas[i]['score']['fullTime']['away']}")
+        if (partidas[i]['score']['winner']) == "HOME_TEAM":
+            vencedor.append((partidas[i]['homeTeam']['shortName']))
+        elif (partidas[i]['score']['winner']) == "AWAY_TEAM":
+            vencedor.append((partidas[i]['awayTeam']['shortName']))
+        elif (partidas[i]['score']['winner']) == "DRAW":
+            vencedor.append("Empate")
+        macth_day.append(partidas[i]['matchday'])
+
+        
+        status.append(status_atual)
+        i += 1
+
+    contador_partidas1 = 1
+    try:
+        while contador_partidas1 < len(time_casa):
+
+            contador_partidas2 = 1
+            rodada_atual.clear()
+
+            while contador_partidas2 <= 10:
+                partida = {
+                    'Time da Casa': "",
+                    'Time de Fora': "",
+                    'Resultado': "",
+                    'Vencedor': "",
+                    'Match Day': 0
+                    }  
+                partida['Time da Casa'] = time_casa[contador_partidas1-1]
+                partida['Time de Fora'] = time_fora[contador_partidas1-1]
+                partida['Resultado'] = resultado[contador_partidas1-1]
+                partida['Vencedor'] = vencedor[contador_partidas1-1]
+                partida['Match Day'] = macth_day[contador_partidas1-1]
+                
+                contador_partidas1 += 1
+                contador_partidas2 += 1
+                rodada_atual.append(partida)
+                
+            rodadas_geral.append(rodada_atual)
+
+    except IndexError:
+        print("Rodadas acabadas")
+   
+
+@bot.message_handler(commands=["rodada"])
+def enviarRodada(mensagem):
+    partidas_finalizadas()
+    chat_id = mensagem.chat.id
+    texto_rodada = ""
+    for i in rodada_atual:
+        texto_rodada += f"{i['Time da Casa']} {i['Resultado']} {i['Time de Fora']}\n" 
+    
+    bot.send_message(chat_id, texto_rodada)
+
 
 bot.polling()
